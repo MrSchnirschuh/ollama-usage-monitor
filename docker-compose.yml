@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  ollama-usage-monitor:
+    build: .
+    container_name: ollama-usage-monitor
+    restart: unless-stopped
+    ports:
+      - "9462:9462"
+    environment:
+      # Your Ollama Cloud cookie (required for usage monitoring)
+      - OLLAMA_COOKIE=${OLLAMA_COOKIE:?required}
+      # Where your local Ollama lives (default: http://192.168.4.9:30068)
+      - OLLAMA_BASE_URL=http://192.168.4.9:30068
+      # Debounce: min seconds between usage fetches after proxy requests
+      - DEBOUNCE_SECONDS=30
+      # Optional: Webhook URL for notifications
+      # - WEBHOOK_URL=https://hooks.example.com/ollama-usage
+      # - WEBHOOK_ALERTS=session_50,session_75,session_90,hit_limit
+      # Optional: Log level (DEBUG, INFO, WARNING, ERROR)
+      - LOG_LEVEL=INFO
+    volumes:
+      - ollama-usage-data:/data
+
+volumes:
+  ollama-usage-data:
