@@ -1,14 +1,27 @@
 # ollama-usage-monitor
 
-Transparent proxy for Ollama that monitors cloud usage from ollama.com and provides chat-based commands to check your session/weekly limits.
+**Transparent proxy for Ollama** that sits between your client (Open WebUI, Hermes, etc.) and your local Ollama instance. It intercepts nothing by default — every `/api/chat` and `/api/generate` request passes through untouched.
+
+But it also fetches your **ollama.com cloud usage** (session + weekly limits) and lets you check it via **chat keywords** or **HTTP endpoints** — without burning a single token.
 
 ```
 Client  --/api/chat--> Usage Monitor (port 9462) --/api/chat--> Ollama (local)
                            |
-                           | GET /api/usage
+                           | GET /api/usage  (every DEBOUNCE_SECONDS)
                            v
                       ollama.com (cloud API)
 ```
+
+### What it tracks
+
+| Field | Example | Meaning |
+|-------|---------|---------|
+| Tier | `pro` | Your ollama.com plan |
+| Session | `16.6% (332/2000)` | Requests used this session (resets ~2h) |
+| Weekly | `20.4% (1020/5000)` | Requests used this week (resets ~4d) |
+| Burn rate | `15.88/h` | Average requests per hour |
+| Models | `deepseek-v4-flash: 82.5%` | Breakdown by model |
+| Recommendation | `ok` / `caution` / `limit` | Should you worry? |
 
 ## Chat Keywords
 
