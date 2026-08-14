@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <rect width="400" height="400" fill="white"/>
+  <!-- Lama body -->
+  <ellipse cx="200" cy="240" rx="70" ry="50" fill="none" stroke="black" stroke-width="6"/>
+  <!-- Lama neck -->
+  <path d="M160 200 Q150 140 170 100" fill="none" stroke="black" stroke-width="6"/>
+  <!-- Lama head -->
+  <ellipse cx="180" cy="90" rx="30" ry="22" fill="none" stroke="black" stroke-width="6"/>
+  <!-- Lama ear -->
+  <path d="M165 70 L160 45 L175 60" fill="none" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <path d="M185 65 L190 40 L195 60" fill="none" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <!-- Lama eye -->
+  <circle cx="190" cy="85" r="4" fill="black"/>
+  <!-- Lama nose -->
+  <path d="M200 95 Q205 98 200 100" fill="none" stroke="black" stroke-width="3"/>
+  <!-- Lama mouth -->
+  <path d="M195 105 Q200 110 205 105" fill="none" stroke="black" stroke-width="2"/>
+  <!-- Lama legs -->
+  <line x1="155" y1="280" x2="150" y2="340" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <line x1="175" y1="285" x2="170" y2="340" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <line x1="220" y1="285" x2="225" y2="340" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <line x1="245" y1="280" x2="250" y2="340" stroke="black" stroke-width="6" stroke-linecap="round"/>
+  <!-- Lama tail -->
+  <path d="M270 230 Q290 220 285 200" fill="none" stroke="black" stroke-width="5" stroke-linecap="round"/>
+  <!-- Text -->
+  <text x="200" y="380" text-anchor="middle" fill="black" font-family="monospace" font-size="16" font-weight="bold">OLLAMA USAGE MONITOR</text>
+</svg>

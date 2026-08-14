@@ -577,24 +577,47 @@ async def proxy(request: Request, path: str):
                             lines.append(f"Recommendation: {a.recommendation()}")
                         if u.models:
                             lines.append("Models:")
-                            total_gpu = sum(state.gpu_ns.values()) or 1
-                            # GPU time per request, normalized to cheapest = 1x
-                            per_req = {
-                                m.get("name", "?"): state.gpu_ns.get(m.get("name", "?"), 0) / m.get("requests", 0)
-                                for m in u.models
-                                if m.get("requests", 0) > 0 and state.gpu_ns.get(m.get("name", "?"), 0) > 0
-                            }
-                            base = min(per_req.values()) if per_req else 1
+                            total_gpu = sum(state.gpu_ns.values())
+                            per_req: dict[str, float] = {}
+                            base = 1.0
+                            if total_gpu:
+                                # GPU time per request, normalized to cheapest = 1x
+                                per_req = {
+                                    m.get("name", "?"): state.gpu_ns.get(m.get("name", "?"), 0) / m.get("requests", 0)
+                                    for m in u.models
+                                    if m.get("requests", 0) > 0 and state.gpu_ns.get(m.get("name", "?"), 0) > 0
+                                }
+                                base = min(per_req.values()) if per_req else 1.0
                             for m in u.models:
                                 pct = m.get("pct", 0)
                                 name = m.get("name", "?")
                                 reqs = m.get("requests", 0)
-                                gpu = state.gpu_ns.get(name, 0)
-                                gshare = gpu / total_gpu * 100 if gpu else 0.0
-                                x = per_req.get(name, 0) / base if per_req.get(name, 0) else 0.0
+                                if total_gpu:
+                                    gpu = state.gpu_ns.get(name, 0)
+                                    gshare = gpu / total_gpu * 100 if gpu else 0.0
+                                    if gpu and per_req.get(name, 0):
+                                        x = per_req[name] / base
+                                        lines.append(
+                                            f"  {name}: {pct:.1f}% ({reqs} req, "
+                                            f"GPU {gshare:.1f}% of used, {x:.1f}x)"
+                                        )
+                                    else:
+                                        lines.append(
+                                            f"  {name}: {pct:.1f}% ({reqs} req, "
+                                            f"no GPU data for this model yet)"
+                                        )
+                                else:
+                                    lines.append(f"  {name}: {pct:.1f}% ({reqs} req, no GPU data yet)")
+                            lines.append("")
+                            if total_gpu:
                                 lines.append(
-                                    f"  {name}: {pct:.1f}% ({reqs} req, "
-                                    f"GPU {gshare:.1f}% of used, {x:.1f}x)"
+                                    "Pct = request share shown on ollama.com/settings; "
+                                    "GPU % = real GPU-time share measured by this proxy."
+                                )
+                            else:
+                                lines.append(
+                                    "Pct = request share shown on ollama.com/settings. "
+                                    "GPU-time share appears after streaming requests through the proxy."
                                 )
                         content = "\n".join(lines)
                 elif keyword == "summary":

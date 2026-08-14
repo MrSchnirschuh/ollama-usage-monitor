@@ -139,18 +139,31 @@ class UsageCollector:
             data["reset_at"] = ""
 
         # --- Model breakdown (deduplicated: sum requests per model) ---
+        # ponytail: skip tool entries (web search/fetch etc.) — they're not models
+        _TOOL_NAMES = {"web search", "web fetch", "web_search", "web_fetch", "tool calls", "tools"}
         models_raw = {}
         for m in re.finditer(
             r'data-model="([^"]+)"[^>]*data-requests="(\d+)"',
             html
         ):
             name = m.group(1)
+            if name.lower() in _TOOL_NAMES:
+                continue
             reqs = int(m.group(2))
             models_raw[name] = models_raw.get(name, 0) + reqs
 
         total_reqs = sum(models_raw.values()) if models_raw else 1
+        # Estimate per-model token share: page only exposes request counts, not
+        # per-model tokens. Approx each model's tokens from its request share.
+        # ponytail: proportional estimate; real per-model tokens aren't scraped.
+        weekly_tokens = data["weekly_used"]
         models = [
-            {"name": name, "requests": reqs, "pct": round(reqs / total_reqs * 100, 1)}
+            {
+                "name": name,
+                "requests": reqs,
+                "pct": round(reqs / total_reqs * 100, 1),
+                "est_tokens": round(weekly_tokens * reqs / total_reqs),
+            }
             for name, reqs in sorted(models_raw.items(), key=lambda x: -x[1])
         ]
         data["models"] = models

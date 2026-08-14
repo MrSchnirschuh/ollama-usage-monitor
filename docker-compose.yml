@@ -9,9 +9,9 @@ services:
       - "9462:9462"
     environment:
       # Your Ollama Cloud cookie (required for usage monitoring)
-      - OLLAMA_COOKIE=${OLLAMA_COOKIE:?required}
+      - OLLAMA_COOKIE=${OLLAMA_COOKIE}
       # Where your local Ollama lives (default: http://localhost:11434)
-      - OLLAMA_BASE_URL=http://localhost:11434
+      - OLLAMA_BASE_URL=http://192.168.4.9:30068
       # Debounce: min seconds between usage fetches after proxy requests
       - DEBOUNCE_SECONDS=30
       # Optional: Webhook URL for notifications

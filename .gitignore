@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env / secrets
+.env
+.ollama.env
+*.env
+
+# Data generated at runtime
+/data
+*.log
+
+# Docker
+*.tar
