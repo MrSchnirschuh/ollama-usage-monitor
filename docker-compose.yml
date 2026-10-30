@@ -12,6 +12,9 @@ services:
       - OLLAMA_COOKIE=${OLLAMA_COOKIE}
       # Where your local Ollama lives (default: http://localhost:11434)
       - OLLAMA_BASE_URL=http://192.168.4.9:30068
+      # Optional: comma-separated ollama.com API keys. When set, *:cloud models
+      # bypass the local Ollama and fail over to the next key on 429/402.
+      # - OLLAMA_CLOUD_KEYS=${OLLAMA_CLOUD_KEYS}
       # Debounce: min seconds between usage fetches after proxy requests
       - DEBOUNCE_SECONDS=30
       # Optional: Webhook URL for notifications

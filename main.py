@@ -28,6 +28,10 @@ from analyzer import UsageAnalyzer, AnalysisResult
 
 OLLAMA_COOKIE = os.environ.get("OLLAMA_COOKIE", "")
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+# Cloud models can bypass the local Ollama: a second API key (different account)
+# only adds capacity if this proxy sends the request itself.
+OLLAMA_CLOUD_URL = os.environ.get("OLLAMA_CLOUD_URL", "https://ollama.com")
+CLOUD_KEYS = [k.strip() for k in os.environ.get("OLLAMA_CLOUD_KEYS", "").split(",") if k.strip()]
 DEBOUNCE_SECONDS = int(os.environ.get("OLLAMA_DEBOUNCE_SECONDS", "30"))
 HISTORY_PATH = os.environ.get("HISTORY_PATH", "/data/usage_history.json")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL", "")
@@ -163,7 +167,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Ollama Cloud Usage Monitor + Proxy",
     description="Transparent proxy for Ollama API with cloud usage monitoring.",
-    version="2.0.0",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -501,6 +505,82 @@ def _strip_keyword_messages(body: bytes) -> bytes:
         return body
 
 
+# ── Cloud key failover ──────────────────────────────────────────────────────
+
+# ponytail: sticky preference, no timers. Whichever key answered last keeps the
+# traffic until it returns 429; capacity is interchangeable between accounts.
+_RETRY_CODES = {401, 402, 403, 429}
+_preferred_key = 0
+
+
+def _is_cloud_model(body: bytes) -> bool:
+    """Cloud models carry ':cloud' in the name; local ones must stay local."""
+    try:
+        return ":cloud" in json.loads(body or b"{}").get("model", "")
+    except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
+        return False
+
+
+async def _cloud_proxy(target_path: str, headers: dict, body: bytes, streaming: bool) -> Response:
+    """Send a cloud-model request to ollama.com, failing over to the next key.
+
+    The local Ollama serves cloud models with one baked-in key. Going direct is
+    the only way a second account can absorb the overflow when key 1 is at its
+    concurrency limit.
+    """
+    global _preferred_key
+    h = {k: v for k, v in headers.items()
+         if k.lower() not in ("authorization", "content-length", "host", "transfer-encoding")}
+    last_status, last_body = 502, b'{"error":"all cloud keys failed"}'
+
+    for step in range(len(CLOUD_KEYS)):
+        idx = (_preferred_key + step) % len(CLOUD_KEYS)
+        client = httpx.AsyncClient(base_url=OLLAMA_CLOUD_URL, timeout=600)
+        try:
+            req = client.build_request(
+                "POST" if body else "GET", target_path,
+                headers={**h, "Authorization": f"Bearer {CLOUD_KEYS[idx]}"},
+                content=body or None,
+            )
+            resp = await client.send(req, stream=True)
+        except httpx.HTTPError as e:
+            await client.aclose()
+            last_status, last_body = 502, json.dumps({"error": str(e)}).encode()
+            logger.warning("Cloud key #%d unreachable: %s", idx + 1, e)
+            continue
+
+        if resp.status_code in _RETRY_CODES:
+            last_status, last_body = resp.status_code, await resp.aread()
+            await resp.aclose()
+            await client.aclose()
+            logger.info("Cloud key #%d answered %s — next key", idx + 1, last_status)
+            continue
+
+        _preferred_key = idx
+        content_type = resp.headers.get("content-type", "application/json")
+
+        if streaming:
+            async def gen(r=resp, c=client):
+                try:
+                    async for chunk in r.aiter_bytes():
+                        _accumulate_gpu_time(chunk)
+                        yield chunk
+                finally:
+                    await r.aclose()
+                    await c.aclose()
+                    asyncio.create_task(debounced_refresh())
+
+            return StreamingResponse(gen(), media_type=content_type, status_code=resp.status_code)
+
+        data = await resp.aread()
+        await resp.aclose()
+        await client.aclose()
+        asyncio.create_task(debounced_refresh())
+        return Response(content=data, status_code=resp.status_code, media_type=content_type)
+
+    return Response(content=last_body, status_code=last_status, media_type="application/json")
+
+
 # ── Catch-all Proxy (must be LAST — catches everything not matched above) ──
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
@@ -778,6 +858,13 @@ async def proxy(request: Request, path: str):
 
         # Strip keyword-only user messages from history before forwarding
         body = _strip_keyword_messages(body)
+
+        # Cloud models go straight to ollama.com when keys are configured, so a
+        # second account can absorb what the first key's concurrency cannot.
+        if CLOUD_KEYS and _is_cloud_model(body):
+            return await _cloud_proxy(
+                target_path, headers, body, _is_streaming_request(body, headers)
+            )
 
         if _is_streaming_request(body, headers):
             return await _proxy_stream(target_path, headers, body)

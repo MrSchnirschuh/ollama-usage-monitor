@@ -77,7 +77,14 @@ volumes:
 |----------|---------|-------------|
 | `OLLAMA_COOKIE` | — | ollama.com session cookie (required) |
 | `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` | Upstream Ollama URL |
+| `OLLAMA_CLOUD_KEYS` | — | Comma-separated ollama.com API keys. When set, `*:cloud` models bypass the local Ollama and go straight to `OLLAMA_CLOUD_URL`; on 401/402/403/429 the next key from a *different account* takes the request. Empty = old behaviour (everything through the local Ollama) |
+| `OLLAMA_CLOUD_URL` | `https://ollama.com` | Upstream for cloud models when keys are set |
 | `DEBOUNCE_SECONDS` | `30` | Min seconds between ollama.com fetches |
 | `LOG_LEVEL` | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR) |
 | `PORT` | `9462` | Proxy listen port |
 | `HISTORY_SIZE` | `20` | Number of snapshots to keep |
+
+Cloud key failover exists because Ollama's concurrency limit is per account (measured: ~13
+concurrent requests per key, `429 too many concurrent requests` beyond it). Two keys of the
+same account share one pool and gain nothing — the second key must belong to another
+account. Self-check: `python3 test_cloud_failover.py`.
